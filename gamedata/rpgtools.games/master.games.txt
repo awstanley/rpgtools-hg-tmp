@@ -1,0 +1,23 @@
+"Game Master"
+{
+	"tf.txt"
+	{
+		"game"		"tf"
+	}
+	
+	"hl2mp.txt"
+	{
+		"game"		"hl2mp"
+	}
+	
+	"cstrike.txt"
+	{
+		"game"		"cstrike"
+	}
+	
+	"dod.txt"
+	{
+		"game"		"dod"
+	}
+
+}

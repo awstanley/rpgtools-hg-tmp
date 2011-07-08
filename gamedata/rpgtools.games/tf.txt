@@ -1,0 +1,29 @@
+"Games"
+{
+	"tf"
+	{
+		"Offsets"
+		{
+			"GetPlayerMaxSpeed"
+			{
+				"library"		"server"
+				"windows"		"428"
+				"linux"			"429"
+			}
+
+			"GetMaxHealth"
+			{
+				"library"		"server"
+				"windows"		"115"
+				"linux"			"116"
+			}
+
+			"OnTakeDamage"				 
+			{
+				"library"		"server"
+				"windows"		"61"
+				"linux"			"62"
+			}
+		}
+	}
+}
