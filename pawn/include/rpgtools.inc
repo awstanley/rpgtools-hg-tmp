@@ -76,7 +76,7 @@ native bool:RPG_SetPlayerStat(iClient, RPG_STAT, Float:fValue);
  * @param iSpeedStat			Speed Stat
  * @return						Success (bool).
  */
-native bool:RPG_SetPlayerStats(iClient, Float:fDamageStat=0.0, Float:fShieldStat=0.0, iHealthStat=0, iSpeedStat=0);
+native bool:RPG_SetPlayerStats(iClient, Float:fDamageStat=0.0, Float:fShieldStat=0.0, iHealthStat=0, Float:fSpeedStat=0.0);
 
 /* Edit nothing below this line */
 public Extension:__ext_rpgtools =
