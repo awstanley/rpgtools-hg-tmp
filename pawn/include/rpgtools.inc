@@ -44,7 +44,19 @@
 #define RPG_STAT_DAMAGE 0
 
 /*--------------------------------------------------------------------------------
-/ Natives Reset
+/ Forwards
+/-------------------------------------------------------------------------------*/
+
+/**
+ * Called when a player is registered and their stats are set to 0.
+ *
+ * @param client				Client Index.
+ */
+forward Action:RPG_GetPlayerData(iClient);
+
+
+/*--------------------------------------------------------------------------------
+/ Natives
 /-------------------------------------------------------------------------------*/
 
 /**
@@ -57,8 +69,11 @@
 native bool:RPG_SetPlayerStat(iClient, RPG_STAT, Float:fValue);
 
 /**
- * Resets all players, players (team 2), weapons, objects, or everything (CTX_ALL).
- * @param CTX_TYPE				CTX Type
+ * @param iClient				Client Index
+ * @param fDamageStat			Damage Stat
+ * @param fShieldStat			Shield Stat
+ * @param iHealthStat			Health Stat
+ * @param iSpeedStat			Speed Stat
  * @return						Success (bool).
  */
 native bool:RPG_SetPlayerStats(iClient, Float:fDamageStat=0.0, Float:fShieldStat=0.0, iHealthStat=0, iSpeedStat=0);
