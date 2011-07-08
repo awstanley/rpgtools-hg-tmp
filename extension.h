@@ -79,10 +79,12 @@ struct RPGChar
 {
 	float DamageStat;	// Damage Bonus
 	float ShieldStat;	// Armour Bonus
-	int SpeedStat;		// Speed Bonus
+	float SpeedStat;	// Speed Bonus
 	int HealthStat;		// Health Bonus
 
-	RPGChar(float D, float S, int H, int A)
+	// Float:fDamageStat=0.0, Float:fShieldStat=0.0, iHealthStat=0, Float:fSpeedStat=0.0
+
+	RPGChar(float D, float A, int H, float S)
 	{
 		DamageStat = D;
 		HealthStat = H;
@@ -119,6 +121,10 @@ extern IGameConfig *g_pGameConf;
 // Now that it's defined:
 extern RPGTools g_RPGTools;
 
+void Hook_LevelShutdown();
+void KillAllStats();
+bool Hook_LevelInit(const char *pMapName, char const *pMapEntities, char const *pOldLevel, char const *pLandmarkName, bool loadGame,bool background);
+
 // WHEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE CATFISH EYES ON A DONKEY
 // -- Holy crap, people read my source code?!
 void RegisterPlayer(CBaseEntity *pBasePlayer);
@@ -127,5 +133,6 @@ void UnregisterPlayer(CBaseEntity *pBasePlayer);
 // Natives
 static cell_t RPG_SetPlayerStat(IPluginContext *pContext, const cell_t *params);
 static cell_t RPG_SetPlayerStats(IPluginContext *pContext, const cell_t *params);
+
 
 #endif // _INCLUDE_SOURCEMOD_EXTENSION_PROPER_H_
