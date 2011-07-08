@@ -98,6 +98,8 @@ bool RPGTools::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
 	char conf_error[255] = "";
 
+	Slots = new RPGChar*[33];
+
 	/* This mod's conf */
 	if (!gameconfs->LoadGameConfigFile("rpgtools.games", &g_pGameConf, conf_error, sizeof(conf_error)))
 	{
