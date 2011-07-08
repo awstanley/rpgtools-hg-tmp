@@ -1,0 +1,29 @@
+"Games"
+{
+	"cstrike"
+	{
+		"Offsets"
+		{
+			"GetPlayerMaxSpeed"
+			{
+				"library"		"server"
+				"windows"		"429"
+				"linux"			"430"
+			}
+			
+			"GetMaxHealth"
+			{
+				"library"		"server"
+				"windows"		"115"
+				"linux"			"116"
+			}
+
+			"OnTakeDamage"				 
+			{
+				"library"		"server"
+				"windows"		"61"
+				"linux"			"62"
+			}
+		}
+	}
+}

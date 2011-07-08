@@ -1,0 +1,29 @@
+"Games"
+{
+	"dod"
+	{
+		"Offsets"
+		{
+			"GetPlayerMaxSpeed"
+			{
+				"library"		"server"
+				"windows"		"426"
+				"linux"			"427"
+			}
+			
+			"GetMaxHealth"
+			{
+				"library"		"server"
+				"windows"		"115"
+				"linux"			"116"
+			}
+
+			"OnTakeDamage"				 
+			{
+				"library"		"server"
+				"windows"		"61"
+				"linux"			"62"
+			}
+		}
+	}
+}
