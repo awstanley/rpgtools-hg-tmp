@@ -93,6 +93,15 @@ struct RPGChar
 	};
 };
 
+// Toys
+#define HOOK_SPEED				0
+#define HOOK_ONTAKEDAMAGE		1
+#define HOOK_HEALTH				2
+
+// Utils!
+#define HOOK_FLASHLIGHT			3
+#define HOOK_FAKEDEATH			4			// CreateRagdollEntity
+
 class RPGTools :
 	public SDKExtension, 
 	public IConCommandBaseAccessor, 
@@ -100,6 +109,8 @@ class RPGTools :
 {
 public: // Data
 	RPGChar **Slots;
+	bool *Hooks;
+	bool *FlashLight;
 
 public: //SDK
 	virtual bool SDK_OnLoad(char *error, size_t maxlength, bool late);
@@ -121,9 +132,20 @@ extern IGameConfig *g_pGameConf;
 // Now that it's defined:
 extern RPGTools g_RPGTools;
 
-void Hook_LevelShutdown();
-void KillAllStats();
+bool IsPlayerValid(int iClient, CBaseEntity *&pBasePlayer);
 bool Hook_LevelInit(const char *pMapName, char const *pMapEntities, char const *pOldLevel, char const *pLandmarkName, bool loadGame,bool background);
+void KillAllStats();
+void Hook_LevelShutdown();
+void Hook_ClientLeaveServer(edict_t *pEntity);
+void Hook_ClientPutInServer(edict_t *pEntity, char const *playername);
+int Hook_OnTakeDamage(CTakeDamageInfo &info);
+int Hook_GetMaxHealth();
+void Hook_CreateRagdollEntity();
+void Hook_FlashLightTurnOn();
+void Hook_FlashLightTurnOff();
+bool Hook_FlashLightIsOn();
+void Hook_UpdateOnRemove();
+float Hook_GetPlayerMaxSpeed();
 
 // WHEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE CATFISH EYES ON A DONKEY
 // -- Holy crap, people read my source code?!
@@ -133,6 +155,10 @@ void UnregisterPlayer(CBaseEntity *pBasePlayer);
 // Natives
 static cell_t RPG_SetPlayerStat(IPluginContext *pContext, const cell_t *params);
 static cell_t RPG_SetPlayerStats(IPluginContext *pContext, const cell_t *params);
-
+static cell_t RPG_GetPlayerStats(IPluginContext *pContext, const cell_t *params);
+static cell_t RPG_ToggleFlashLight(IPluginContext *pContext, const cell_t *params);
+static cell_t RPG_SetFlashLight(IPluginContext *pContext, const cell_t *params);
+static cell_t RPG_GetFlashLight(IPluginContext *pContext, const cell_t *params);
+static cell_t RPG_FakeDeath(IPluginContext *pContext, const cell_t *params);
 
 #endif // _INCLUDE_SOURCEMOD_EXTENSION_PROPER_H_

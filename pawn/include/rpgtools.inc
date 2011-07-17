@@ -78,6 +78,17 @@ native bool:RPG_SetPlayerStat(iClient, RPG_STAT, Float:fValue);
  */
 native bool:RPG_SetPlayerStats(iClient, Float:fDamageStat=0.0, Float:fShieldStat=0.0, iHealthStat=0, Float:fSpeedStat=0.0);
 
+native bool:RPG_GetPlayerStats(iClient, Float:fDamageStat, Float:fShieldStat, iHealthStat, Float:fSpeedStat);
+
+/*
+ * Should all be obvious, and I'm lazy.
+ */
+
+native bool:RPG_ToggleFlashLight(iClient);
+native bool:RPG_GetFlashLight(iClient);
+native bool:RPG_SetFlashLight(iClient, bool:SetOn=true);
+native bool:RPG_FakeDeath(iClient);
+
 /* Edit nothing below this line */
 public Extension:__ext_rpgtools =
 {
@@ -100,5 +111,11 @@ public __ext_rpgtools_SetNTVOptional()
 {
 	MarkNativeAsOptional("RPG_SetPlayerStats");
 	MarkNativeAsOptional("RPG_SetPlayerStat");
+	MarkNativeAsOptional("RPG_GetPlayerStats");
+	MarkNativeAsOptional("RPG_GetFlashLight");
+	MarkNativeAsOptional("RPG_ToggleFlashLight");
+	MarkNativeAsOptional("RPG_GetFlashLight");
+	MarkNativeAsOptional("RPG_SetFlashLight");
+	MarkNativeAsOptional("RPG_FakeDeath");
 }
 #endif
