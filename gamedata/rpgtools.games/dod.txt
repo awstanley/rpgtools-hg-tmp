@@ -24,6 +24,42 @@
 				"windows"		"61"
 				"linux"			"62"
 			}
+			
+			"UpdateOnRemove"
+			{
+				"library"		"server"
+				"windows"		"103"
+				"linux"			"104"
+			}
+			
+			
+			"CreateRagdollEntity"
+			{
+				"library"		"server"
+				"windows"		"413"
+				"linux"			"414"
+			}			
+			
+			"FlashlightIsOn"
+			{
+				"library"		"server"
+				"windows"		"345"
+				"linux"			"346"
+			}
+
+			"FlashlightTurnOn"
+			{
+				"library"		"server"
+				"windows"		"346"
+				"linux"			"347"
+			}
+			
+			"FlashlightTurnOff"
+			{
+				"library"		"server"
+				"windows"		"347"
+				"linux"			"348"
+			}
 		}
 	}
 }

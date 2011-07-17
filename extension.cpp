@@ -76,6 +76,17 @@ SH_DECL_MANUALHOOK0(SHook_GetMaxHealth, 0, 0, 0, int);
 // Speed Related
 SH_DECL_MANUALHOOK0(SHook_GetPlayerMaxSpeed, 0, 0, 0, float);
 
+// Fake Death
+SH_DECL_MANUALHOOK0_void(SHook_CreateRagdollEntity, 0, 0, 0);
+
+// Flash Light
+SH_DECL_MANUALHOOK0_void(SHook_FlashLightTurnOn, 0, 0, 0);
+SH_DECL_MANUALHOOK0_void(SHook_FlashLightTurnOff, 0, 0, 0);
+SH_DECL_MANUALHOOK0(SHook_FlashLightIsOn, 0, 0, 0, bool);
+
+// OnUpdateRemove (map change)
+SH_DECL_MANUALHOOK0_void(SHook_UpdateOnRemove, 0, 0, 0);
+
 /*****************************************************************************
  * Natives																	 
  *****************************************************************************/
@@ -85,6 +96,14 @@ sp_nativeinfo_t g_ExtensionNatives[] =
 	// Set player statistic
 	{ "RPG_SetPlayerStat",				RPG_SetPlayerStat },
 	{ "RPG_SetPlayerStats",				RPG_SetPlayerStats },
+	{ "RPG_GetPlayerStats",				RPG_GetPlayerStats },
+
+	{ "RPG_ToggleFlashLight",			RPG_ToggleFlashLight },
+	{ "RPG_GetFlashLight",				RPG_GetFlashLight },
+	{ "RPG_SetFlashLight",				RPG_SetFlashLight },
+
+	{ "RPG_FakeDeath",					RPG_FakeDeath },
+
 
 	// Null :3
 	{ NULL,								NULL }
@@ -99,8 +118,25 @@ IForward *g_pFwdGetPlayerData = NULL;
  * Extension Core
  *****************************************************************************/
 
+bool IsPlayerValid(int iClient, CBaseEntity *&pBasePlayer)
+{
+	IGamePlayer *pPlayer = playerhelpers->GetGamePlayer(iClient);
+	if (pPlayer == NULL) return false;
+	if (pPlayer->IsConnected() == false) return false;
+	if (pPlayer->IsFakeClient() == true) return false;
+	if (pPlayer->IsInGame() == false) return false;
+	edict_t * pEdict = pPlayer->GetEdict();
+	if (pEdict == NULL) return false;
+	if (pEdict->IsFree()) return false;
+	pBasePlayer = (CBaseEntity *)pEdict->m_pNetworkable->GetBaseEntity();
+	if (pBasePlayer == NULL) return false;
+	return true; // WINNAR :D
+}
+
 bool RPGTools::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
+	Hooks = new bool[7];
+
 	char conf_error[255] = "";
 
 	Slots = new RPGChar*[33];
@@ -117,22 +153,24 @@ bool RPGTools::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	}
 
 	int iOffset;
-	if (!g_pGameConf->GetOffset("GetMaxHealth", &iOffset))
+
+	if (!g_pGameConf->GetOffset("UpdateOnRemove", &iOffset))
 	{
-		sprintf(error, "Found no offset for 'GetMaxHealth'");
+		sprintf(error, "Disabling: Found no offset for 'UpdateOnRemove' (required to stop mapchange crashes)");
 		g_pSM->LogMessage(myself, error);
 		return false;
 	}
 	else
 	{
-		SH_MANUALHOOK_RECONFIGURE(SHook_GetMaxHealth, iOffset, 0, 0);
+		SH_MANUALHOOK_RECONFIGURE(SHook_UpdateOnRemove, iOffset, 0, 0);
 	}
 
 	if (!g_pGameConf->GetOffset("GetPlayerMaxSpeed", &iOffset))
 	{
-		sprintf(error, "Found no offset for 'GetPlayerMaxSpeed'");
+		sprintf(error, "Disabling Player Speed Manipulation: Found no offset for 'GetPlayerMaxSpeed'");
 		g_pSM->LogMessage(myself, error);
-		return false;
+		Hooks[HOOK_SPEED] = false;
+		Hooks[HOOK_SPEED] = true;
 	}
 	else
 	{
@@ -141,13 +179,53 @@ bool RPGTools::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	if (!g_pGameConf->GetOffset("OnTakeDamage", &iOffset))
 	{
-		sprintf(error, "Found no offset for 'OnTakeDamage'");
+		sprintf(error, "Disabling Damage Manipulation: Found no offset for 'OnTakeDamage'");
 		g_pSM->LogMessage(myself, error);
-		return false;
+		Hooks[HOOK_ONTAKEDAMAGE] = false;
 	}
 	else
 	{
+		Hooks[HOOK_ONTAKEDAMAGE] = true;
 		SH_MANUALHOOK_RECONFIGURE(SHook_OnTakeDamage, iOffset, 0, 0);
+	}
+
+	if (!g_pGameConf->GetOffset("GetMaxHealth", &iOffset))
+	{
+		sprintf(error, "Disabling Health Manipulation: Found no offset for 'GetMaxHealth'");
+		g_pSM->LogMessage(myself, error);
+		Hooks[HOOK_HEALTH] = false;
+	}
+	else
+	{
+		Hooks[HOOK_HEALTH] = true;
+		SH_MANUALHOOK_RECONFIGURE(SHook_GetMaxHealth, iOffset, 0, 0);
+	}
+
+	int iOffset2; int iOffset3;
+	if (g_pGameConf->GetOffset("FlashLightTurnOn", &iOffset) && g_pGameConf->GetOffset("FlashLightTurnOff", &iOffset2) && g_pGameConf->GetOffset("FlashLightIsOn", &iOffset3))
+	{
+		sprintf(error, "Disabling FlashLight Manipulation: Could not find offsets for 'FlashLightTurnOn', 'FlashLightTurnOff', and/or 'FlashLightIsOn'.");
+		g_pSM->LogMessage(myself, error);
+		Hooks[HOOK_FLASHLIGHT] = false;
+	}
+	else
+	{
+		Hooks[HOOK_FLASHLIGHT] = true;
+		SH_MANUALHOOK_RECONFIGURE(SHook_FlashLightTurnOn, iOffset, 0, 0);
+		SH_MANUALHOOK_RECONFIGURE(SHook_FlashLightTurnOff, iOffset2, 0, 0);
+		SH_MANUALHOOK_RECONFIGURE(SHook_FlashLightIsOn, iOffset3, 0, 0);
+	}
+
+	if (!g_pGameConf->GetOffset("CreateRagdollEntity", &iOffset))
+	{
+		sprintf(error, "Disabling FakeDeath: Found no offset for 'CreateRagdollEntity'");
+		g_pSM->LogMessage(myself, error);
+		Hooks[HOOK_HEALTH] = false;
+	}
+	else
+	{
+		Hooks[HOOK_FAKEDEATH] = true;
+		SH_MANUALHOOK_RECONFIGURE(SHook_GetMaxHealth, iOffset, 0, 0);
 	}
 
 	// Hook client join/part
@@ -192,16 +270,8 @@ bool RPGTools::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		// Hook everyone in game
 		for (int iClient = 1; iClient <= iMaxClients; iClient++)
 		{
-			IGamePlayer *pPlayer = playerhelpers->GetGamePlayer(iClient);
-			if (pPlayer == NULL) continue;
-			if (pPlayer->IsConnected() == false) continue;
-			if (pPlayer->IsFakeClient() == true) continue;
-			if (pPlayer->IsInGame() == false) continue;
-			edict_t * pEdict = pPlayer->GetEdict();
-			if (pEdict == NULL) continue;
-			if (pEdict->IsFree()) continue;
-			CBaseEntity *pBasePlayer = (CBaseEntity *)pEdict->m_pNetworkable->GetBaseEntity();
-			if (pBasePlayer == NULL) continue;
+			CBaseEntity *pBasePlayer;
+			if(!IsPlayerValid(iClient, pBasePlayer)) continue;
 
 			// Register the player
 			RegisterPlayer(pBasePlayer);
@@ -270,9 +340,17 @@ void RegisterPlayer(CBaseEntity *pBasePlayer)
 	g_pFwdGetPlayerData->Execute(&cellResults);
 
 	// Do Hooks
-	SH_ADD_MANUALHOOK_STATICFUNC(SHook_OnTakeDamage, pBasePlayer, Hook_OnTakeDamage, true);
-	SH_ADD_MANUALHOOK_STATICFUNC(SHook_GetMaxHealth, pBasePlayer, Hook_GetMaxHealth, false);
-	SH_ADD_MANUALHOOK_STATICFUNC(SHook_GetPlayerMaxSpeed, pBasePlayer, Hook_GetPlayerMaxSpeed, false);
+	SH_ADD_MANUALHOOK_STATICFUNC(SHook_UpdateOnRemove, pBasePlayer, Hook_UpdateOnRemove, false);
+	if(g_RPGTools.Hooks[HOOK_ONTAKEDAMAGE]) SH_ADD_MANUALHOOK_STATICFUNC(SHook_OnTakeDamage, pBasePlayer, Hook_OnTakeDamage, true);
+	if(g_RPGTools.Hooks[HOOK_HEALTH]) SH_ADD_MANUALHOOK_STATICFUNC(SHook_GetMaxHealth, pBasePlayer, Hook_GetMaxHealth, false);
+	if(g_RPGTools.Hooks[HOOK_SPEED]) SH_ADD_MANUALHOOK_STATICFUNC(SHook_GetPlayerMaxSpeed, pBasePlayer, Hook_GetPlayerMaxSpeed, false);
+	if(g_RPGTools.Hooks[HOOK_FAKEDEATH]) SH_ADD_MANUALHOOK_STATICFUNC(SHook_CreateRagdollEntity, pBasePlayer, Hook_CreateRagdollEntity, false);
+	if(g_RPGTools.Hooks[HOOK_FLASHLIGHT])
+	{
+		SH_ADD_MANUALHOOK_STATICFUNC(SHook_FlashLightTurnOn, pBasePlayer, Hook_FlashLightTurnOn, false);
+		SH_ADD_MANUALHOOK_STATICFUNC(SHook_FlashLightTurnOff, pBasePlayer, Hook_FlashLightTurnOff, false);
+		SH_ADD_MANUALHOOK_STATICFUNC(SHook_FlashLightIsOn, pBasePlayer, Hook_FlashLightIsOn, false);
+	}
 }
 
 // Unregister the player.
@@ -281,10 +359,10 @@ void UnregisterPlayer(CBaseEntity *pBasePlayer)
 	edict_t *pEdict = gameents->BaseEntityToEdict(pBasePlayer);
 	int iClient = engine->IndexOfEdict(pEdict);
 
-	SH_REMOVE_MANUALHOOK_STATICFUNC(SHook_OnTakeDamage, pBasePlayer, Hook_OnTakeDamage, true);
-	SH_REMOVE_MANUALHOOK_STATICFUNC(SHook_GetMaxHealth, pBasePlayer, Hook_GetMaxHealth, false);
-	SH_REMOVE_MANUALHOOK_STATICFUNC(SHook_GetPlayerMaxSpeed, pBasePlayer, Hook_GetPlayerMaxSpeed, false);
-
+	SH_REMOVE_MANUALHOOK_STATICFUNC(SHook_UpdateOnRemove, pBasePlayer, Hook_UpdateOnRemove, false);
+	if(g_RPGTools.Hooks[HOOK_ONTAKEDAMAGE]) SH_REMOVE_MANUALHOOK_STATICFUNC(SHook_OnTakeDamage, pBasePlayer, Hook_OnTakeDamage, true);
+	if(g_RPGTools.Hooks[HOOK_HEALTH]) SH_REMOVE_MANUALHOOK_STATICFUNC(SHook_GetMaxHealth, pBasePlayer, Hook_GetMaxHealth, false);
+	if(g_RPGTools.Hooks[HOOK_SPEED]) SH_REMOVE_MANUALHOOK_STATICFUNC(SHook_GetPlayerMaxSpeed, pBasePlayer, Hook_GetPlayerMaxSpeed, false);
 	g_RPGTools.Slots[iClient] = NULL;
 }
 
@@ -292,21 +370,22 @@ void UnregisterPlayer(CBaseEntity *pBasePlayer)
  * Hooks
  *****************************************************************************/
 
+void Hook_UpdateOnRemove()
+{
+	CBaseEntity *pBasePlayer = META_IFACEPTR(CBaseEntity);
+	if(IsPlayerValid(engine->IndexOfEdict(gameents->BaseEntityToEdict(pBasePlayer)), pBasePlayer))
+	{
+		UnregisterPlayer(pBasePlayer);
+	}
+}
+
 bool Hook_LevelInit(const char *pMapName, char const *pMapEntities, char const *pOldLevel, char const *pLandmarkName, bool loadGame,bool background)
 {
 	int iMaxClients = playerhelpers->GetMaxClients();
 	for (int iClient = 1; iClient <= iMaxClients; iClient++)
 	{
-		IGamePlayer *pPlayer = playerhelpers->GetGamePlayer(iClient);
-		if (pPlayer == NULL) continue;
-		if (pPlayer->IsConnected() == false) continue;
-		if (pPlayer->IsFakeClient() == true) continue;
-		if (pPlayer->IsInGame() == false) continue;
-		edict_t * pEdict = pPlayer->GetEdict();
-		if (pEdict == NULL) continue;
-		if (pEdict->IsFree()) continue;
-		CBaseEntity *pBasePlayer = (CBaseEntity *)pEdict->m_pNetworkable->GetBaseEntity();
-		if (pBasePlayer == NULL) continue;
+		CBaseEntity *pBasePlayer;
+		if(!IsPlayerValid(iClient, pBasePlayer)) continue;
 
 		// Register the player
 		RegisterPlayer(pBasePlayer);
@@ -319,16 +398,8 @@ void KillAllStats()
 	int iMaxClients = playerhelpers->GetMaxClients();
 	for (int iClient = 1; iClient <= iMaxClients; iClient++)
 	{
-		IGamePlayer *pPlayer = playerhelpers->GetGamePlayer(iClient);
-		if (pPlayer == NULL) continue;
-		if (pPlayer->IsConnected() == false) continue;
-		if (pPlayer->IsFakeClient() == true) continue;
-		if (pPlayer->IsInGame() == false) continue;
-		edict_t * pEdict = pPlayer->GetEdict();
-		if (pEdict == NULL) continue;
-		if (pEdict->IsFree()) continue;
-		CBaseEntity *pBasePlayer = (CBaseEntity *)pEdict->m_pNetworkable->GetBaseEntity();
-		if (pBasePlayer == NULL) continue;
+		CBaseEntity *pBasePlayer;
+		if(!IsPlayerValid(iClient, pBasePlayer)) continue;
 
 		// Register the player
 		UnregisterPlayer(pBasePlayer);
@@ -419,6 +490,27 @@ int Hook_GetMaxHealth()
 	RETURN_META_VALUE(MRES_SUPERCEDE,BaseHealth);
 }
 
+void Hook_CreateRagdollEntity()
+{
+	RETURN_META(MRES_IGNORED); 
+}
+
+void Hook_FlashLightTurnOn()
+{
+	RETURN_META(MRES_IGNORED); 
+}
+
+void Hook_FlashLightTurnOff()
+{
+	RETURN_META(MRES_IGNORED); 
+}
+
+bool Hook_FlashLightIsOn()
+{
+	// Ugly patch to stop the most idiotic error ever
+	RETURN_META_VALUE(MRES_IGNORED, SH_MCALL(META_IFACEPTR(CBaseEntity), SHook_FlashLightIsOn)()); 
+}
+
 float Hook_GetPlayerMaxSpeed()
 {
 	CBaseEntity *pPlayer = META_IFACEPTR(CBaseEntity);
@@ -440,10 +532,19 @@ static cell_t RPG_SetPlayerStat(IPluginContext *pContext, const cell_t *params)
 	{
 		float Value = sp_ctof(params[3]);
 
+		if(params[0] != 1) return false;
+		int iClient = params[1];
+		CBaseEntity *pBasePlayer;
+		if(!IsPlayerValid(iClient, pBasePlayer))
+		{
+			pContext->ThrowNativeError("Invalid client index: %i", iClient);
+		}
+
 		if(g_RPGTools.Slots[params[1]] == NULL)
 		{
 			g_RPGTools.Slots[params[1]] = new RPGChar(0,0,0,0);
 		}
+
 
 		switch(params[1])
 		{
@@ -468,20 +569,173 @@ static cell_t RPG_SetPlayerStats(IPluginContext *pContext, const cell_t *params)
 {
 	if(params[0] == 5)
 	{
-		if(g_RPGTools.Slots[params[1]] != NULL)
+		if(params[0] != 1) return false;
+		int iClient = params[1];
+		CBaseEntity *pBasePlayer;
+		if(!IsPlayerValid(iClient, pBasePlayer))
 		{
-			g_RPGTools.Slots[params[1]] = new RPGChar(sp_ctof(params[2]), sp_ctof(params[3]), params[4], sp_ctof(params[5]));
-			if(g_OhGodWhy.GetBool()) g_pSM->LogMessage(myself, "RPG_SETPLAYERSTATS: %i | %4.2f | %4.2f| %i | %4.2f", params[1], g_RPGTools.Slots[params[1]]->DamageStat, g_RPGTools.Slots[params[1]]->ShieldStat, g_RPGTools.Slots[params[1]]->HealthStat, g_RPGTools.Slots[params[1]]->SpeedStat);
-			return 1;
+			pContext->ThrowNativeError("Invalid client index: %i", iClient);
 		}
-		else
+
+		if(g_RPGTools.Slots[params[1]] == NULL)
 		{
-			return 0;
+			g_RPGTools.Slots[params[1]] = new RPGChar(0,0,0,0);
 		}
+
+		g_RPGTools.Slots[params[1]] = new RPGChar(sp_ctof(params[2]), sp_ctof(params[3]), params[4], sp_ctof(params[5]));
+		if(g_OhGodWhy.GetBool()) g_pSM->LogMessage(myself, "RPG_SETPLAYERSTATS: %i | %4.2f | %4.2f| %i | %4.2f", params[1], g_RPGTools.Slots[params[1]]->DamageStat, g_RPGTools.Slots[params[1]]->ShieldStat, g_RPGTools.Slots[params[1]]->HealthStat, g_RPGTools.Slots[params[1]]->SpeedStat);
+		return 1;
 	}
 	else
 	{
 		pContext->ThrowNativeError("Incorrect parameter count \n  - Proper usage: \n     RPG_SetPlayerStats(iClient, Float:iDamageStat, Float:iShieldStat, iHealthStat, iSpeedStat)");
 	}
 	return 0;
+}
+
+
+// native bool:RPG_GetPlayerStats(iClient, Float:fDamageStat, Float:fShieldStat, iHealthStat, Float:fSpeedStat);
+static cell_t RPG_GetPlayerStats(IPluginContext *pContext, const cell_t *params)
+{
+	if(params[0] == 5)
+	{
+		if(params[0] != 1) return false;
+		int iClient = params[1];
+		CBaseEntity *pBasePlayer;
+		if(!IsPlayerValid(iClient, pBasePlayer))
+		{
+			pContext->ThrowNativeError("Invalid client index: %i", iClient);
+		}
+
+		if(g_RPGTools.Slots[params[1]] == NULL)
+		{
+			g_RPGTools.Slots[params[1]] = new RPGChar(0,0,0,0);
+		}
+
+		RPGChar *C = g_RPGTools.Slots[params[1]];
+
+		cell_t *p2; pContext->LocalToPhysAddr(params[2], &p2); *p2 = sp_ftoc(C->DamageStat);
+		cell_t *p3; pContext->LocalToPhysAddr(params[3], &p3); *p3 = sp_ftoc(C->ShieldStat);
+		cell_t *p4; pContext->LocalToPhysAddr(params[4], &p4); *p4 = C->HealthStat;
+		cell_t *p5; pContext->LocalToPhysAddr(params[5], &p5); *p5 = sp_ftoc(C->SpeedStat);
+
+		return 1;
+	}
+	else
+	{
+		pContext->ThrowNativeError("Incorrect number of buffers");
+	}
+	return 0;
+}
+
+
+// native bool:RPG_ToggleFlashLight(iClient);
+static cell_t RPG_ToggleFlashLight(IPluginContext *pContext, const cell_t *params)
+{
+	if(!g_RPGTools.Hooks[HOOK_FLASHLIGHT]) return false;
+	if(params[0] != 1) return false;
+	int iClient = params[1];
+	CBaseEntity *pBasePlayer;
+	if(!IsPlayerValid(iClient, pBasePlayer))
+	{
+		pContext->ThrowNativeError("Invalid client index: %i", iClient);
+	}
+
+	bool Status = SH_MCALL(pBasePlayer, SHook_FlashLightIsOn)();
+	
+	if(Status)
+	{
+		SH_MCALL(pBasePlayer, SHook_FlashLightTurnOff)();
+	}
+	else
+	{
+		SH_MCALL(pBasePlayer, SHook_FlashLightTurnOn)();
+	}
+
+	bool Status2 = SH_MCALL(pBasePlayer, SHook_FlashLightIsOn)();
+
+	if(Status != Status2)
+	{
+		if(g_OhGodWhy.GetBool()) g_pSM->LogMessage(myself, "Flashlight toggle succeeded on %i : now set to %s", iClient, Status2 ? "true":"false");
+		g_RPGTools.FlashLight[iClient] = Status2;
+		return true;
+	}
+
+	return false;
+}
+
+// native bool:RPG_GetFlashLight(iClient);
+static cell_t RPG_GetFlashLight(IPluginContext *pContext, const cell_t *params)
+{
+	if(!g_RPGTools.Hooks[HOOK_FLASHLIGHT]) return false;
+	if(params[0] != 1) return false;
+	int iClient = params[1];
+	CBaseEntity *pBasePlayer;
+	if(!IsPlayerValid(iClient, pBasePlayer))
+	{
+		pContext->ThrowNativeError("Invalid client index: %i", iClient);
+	}
+
+	// Query it
+	bool Status = SH_MCALL(pBasePlayer, SHook_FlashLightIsOn)();
+	if(Status != g_RPGTools.FlashLight[iClient])
+	{
+		g_RPGTools.FlashLight[iClient] = Status;
+	}
+
+	return Status;
+}
+
+// native bool:RPG_SetFlashLight(iClient, bool:SetOn=true);
+static cell_t RPG_SetFlashLight(IPluginContext *pContext, const cell_t *params)
+{
+	if(!g_RPGTools.Hooks[HOOK_FLASHLIGHT]) return false;
+	if(params[0] != 2) return false;
+	int iClient = params[1];
+	CBaseEntity *pBasePlayer;
+	if(!IsPlayerValid(iClient, pBasePlayer))
+	{
+		pContext->ThrowNativeError("Invalid client index: %i", iClient);
+	}
+
+	bool Status = SH_MCALL(pBasePlayer, SHook_FlashLightIsOn)();
+	bool OnOff = (bool)params[2];
+	if(Status == OnOff) return true;
+	
+	// Otherwise ...
+	if(OnOff)
+	{
+		SH_MCALL(pBasePlayer, SHook_FlashLightTurnOn)();
+	}
+	else
+	{
+		SH_MCALL(pBasePlayer, SHook_FlashLightTurnOff)();
+	}
+
+	bool Status2 = SH_MCALL(pBasePlayer, SHook_FlashLightIsOn)();
+
+	if(Status != Status2)
+	{
+		if(g_OhGodWhy.GetBool()) g_pSM->LogMessage(myself, "Flashlight toggle succeeded on %i : now set to %s", iClient, Status2 ? "true":"false");
+		g_RPGTools.FlashLight[iClient] = Status2;
+		return true;
+	}
+
+	return false;
+}
+
+// native bool:RPG_FakeDeath(iClient);
+static cell_t RPG_FakeDeath(IPluginContext *pContext, const cell_t *params)
+{
+	if(!g_RPGTools.Hooks[HOOK_FAKEDEATH]) return false;
+	if(params[0] != 1) return false;
+	int iClient = params[1];
+	CBaseEntity *pBasePlayer;
+	if(!IsPlayerValid(iClient, pBasePlayer))
+	{
+		pContext->ThrowNativeError("Invalid client index: %i", iClient);
+	}
+
+	SH_MCALL(pBasePlayer, SHook_CreateRagdollEntity);
+	return true;
 }
